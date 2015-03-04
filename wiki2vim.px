@@ -63,4 +63,4 @@ foreach my $meaning (keys %contraction) {
     $meaning =~ s/\s+/\\_s\\+/g;
     print $meaning;
 }
-print "\\)\\>/\\=s:Contract(submatch(0))/gc\n";
+print "\\)\\>/\\=s:Contract(submatch(0))/igc\n";
