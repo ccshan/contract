@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+#
+# Generate a Vim script that, when sourced, performs :%s///gc to use English
+# contractions throughout the current file.
+
+use strict;
+use HTML::TableExtract;
+
+sub quoteVim ($) {
+    my ($string) = @_;
+    $string =~ s/'/''/g;
+    return "'$string'";
+}
+
+my $html;
+{
+    local $/;
+    $html = <>;
+}
+my $te = HTML::TableExtract->new(headers => [qw(Contraction Meaning)]);
+$te->parse($html);
+
+my %contraction;
+print "let s:contractions = {";
+my $first = 1;
+foreach my $row ($te->rows)
+{
+    my ($contraction, $meanings) = @$row;
+    $meanings =~ s/(\s|\[\d+\])+/ /g;
+    foreach my $meaning ($meanings =~ /[^\s\/][^\/]*[^\s\/]/g) {
+        warn "Duplicate meaning $meaning\n" if exists $contraction{$meaning};
+        $contraction{$meaning} = $contraction;
+        if ($first) {
+            undef $first;
+        } else {
+            print ", ";
+        }
+        print quoteVim(lc $meaning), ":", quoteVim($contraction);
+    }
+}
+print "}\n";
+
+print <<'END';
+function! s:Contract(meaning)
+    let l:meaning = substitute(a:meaning, '\_s\+', ' ', 'g')
+    let l:contraction = s:contractions[tolower(l:meaning)]
+    if l:meaning[0] ==# toupper(l:meaning[0])
+        return toupper(l:contraction[0]) . l:contraction[1:]
+    else
+        return l:contraction
+    endif
+endfunction
+END
+
+print "%s/\\<\\(";
+$first = 1;
+foreach my $meaning (keys %contraction) {
+    if ($first) {
+        undef $first;
+    } else {
+        print "\\|";
+    }
+    $meaning =~ s/\s+/\\_s\\+/g;
+    print $meaning;
+}
+print "\\)\\>/\\=s:Contract(submatch(0))/gc\n";
